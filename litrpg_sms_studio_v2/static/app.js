@@ -1,4 +1,3 @@
-\
 /* System Message Studio v2
  * - 7 window types
  * - themes + custom css

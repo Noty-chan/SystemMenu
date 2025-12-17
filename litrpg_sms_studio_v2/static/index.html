@@ -1,0 +1,252 @@
+\
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>System Message Studio v2</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">System Message Studio</div>
+
+    <div class="bar">
+      <div class="bar-group">
+        <div class="lbl">Тип</div>
+        <select id="uiType"></select>
+      </div>
+
+      <div class="bar-group">
+        <div class="lbl">Тема</div>
+        <select id="uiTheme"></select>
+        <button class="btn small ghost" id="uiThemeToggle">Тема</button>
+      </div>
+
+      <div class="bar-group">
+        <div class="lbl">FX</div>
+        <select id="uiFxMode">
+          <option value="none">Нет</option>
+          <option value="lag">Лаг</option>
+          <option value="glitch">Глич</option>
+          <option value="scanlines">Скан‑линии</option>
+        </select>
+      </div>
+
+      <div class="bar-group">
+        <div class="lbl">Холст</div>
+        <select id="uiCanvas">
+          <option value="1920x1080">1920×1080</option>
+          <option value="2560x1440">2560×1440</option>
+          <option value="3840x2160">3840×2160</option>
+        </select>
+      </div>
+
+      <div class="bar-group">
+        <div class="lbl">Экспорт</div>
+        <select id="uiExportTarget">
+          <option value="window">Окно</option>
+          <option value="canvas">Холст</option>
+        </select>
+        <select id="uiExportScale">
+          <option value="1">1×</option>
+          <option value="2" selected>2×</option>
+          <option value="3">3×</option>
+          <option value="4">4×</option>
+        </select>
+        <button class="btn primary" id="uiExport">PNG</button>
+      </div>
+
+      <div class="bar-group">
+        <button class="btn small" id="uiUndo">Undo</button>
+        <button class="btn small" id="uiRedo">Redo</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Left -->
+    <section class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Контент</div>
+        <div class="fmt">
+          <button class="btn small" id="fmtBold">B</button>
+          <button class="btn small" id="fmtItal">I</button>
+          <button class="btn small" id="fmtAccent">A</button>
+          <button class="btn small" id="fmtUnder">U</button>
+          <button class="btn small" id="fmtStrike">S</button>
+          <button class="btn small" id="fmtCode">`</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="uiFields"></div>
+
+        <div class="sep"></div>
+
+        <div class="field">
+          <label>Метки</label>
+          <div class="toolbar" id="uiMarkers"></div>
+          <div class="help">Вставка в активное поле. Метки — просто токены, удобны для шаблонов.</div>
+        </div>
+
+        <div class="field">
+          <label>Блоки</label>
+          <div class="toolbar" id="uiBlocks"></div>
+          <div class="help">Вставляет готовые шаблоны: pill/tag и т.п.</div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="field">
+          <label>FX: интенсивность <span class="mini" id="uiFxIntVal"></span></label>
+          <input type="range" id="uiFxIntensity" min="0" max="200" value="80"/>
+        </div>
+
+        <div class="field">
+          <label>Коррупция текста <span class="mini" id="uiCorruptVal"></span></label>
+          <input type="range" id="uiCorrupt" min="0" max="40" value="0"/>
+          <div class="row">
+            <button class="btn small ghost" id="uiNewSeed">Новый сид</button>
+            <button class="btn small" id="uiFreezeSeed">Фиксировать сид</button>
+          </div>
+          <div class="help">Коррупция применяется только к текстовым зонам (не к ключам/числам), чтобы чтение оставалось возможным.</div>
+        </div>
+
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="uiSnap"/> Сетка 8px (snap)</label>
+          <label class="chk"><input type="checkbox" id="uiGrid"/> Показать сетку</label>
+        </div>
+
+        <div class="row">
+          <label class="chk"><input type="checkbox" id="uiFreezeFx" checked/> Заморозить анимации при экспорте</label>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="row">
+          <button class="btn" id="uiSavePreset">Сохранить пресет</button>
+          <button class="btn ghost" id="uiExportJson">Экспорт JSON</button>
+          <label class="btn ghost" style="display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+            Импорт JSON
+            <input type="file" id="uiImportJson" accept="application/json" style="display:none;">
+          </label>
+        </div>
+
+        <div class="field" style="margin-top:10px;">
+          <label>Пресеты</label>
+          <div class="toolbar" id="uiPresets"></div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="field">
+          <label>JSON текущего проекта</label>
+          <div class="row">
+            <button class="btn small ghost" id="uiShowJson">Показать</button>
+            <button class="btn small" id="uiApplyJson">Применить</button>
+          </div>
+          <textarea id="uiJson" style="display:none; min-height:160px;" spellcheck="false"></textarea>
+          <div class="help">Можно быстро править: тип, тема, контент, позицию/размер, FX, темы/пресеты.</div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="row">
+          <button class="btn danger" id="uiReset">Сброс</button>
+        </div>
+
+        <!-- Theme editor -->
+        <div id="themeEditor" class="theme-editor" style="display:none;">
+          <div class="sep"></div>
+          <div class="panel-title" style="margin-bottom:10px;">Тема</div>
+
+          <div class="field">
+            <label>Имя темы</label>
+            <input type="text" id="tName" placeholder="например: Parchment Ash"/>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Панель</label>
+              <input type="color" id="tPanelBg"/>
+            </div>
+            <div class="field">
+              <label>Текст</label>
+              <input type="color" id="tInk"/>
+            </div>
+            <div class="field">
+              <label>Граница</label>
+              <input type="color" id="tBorder"/>
+            </div>
+            <div class="field">
+              <label>Акцент</label>
+              <input type="color" id="tAccent"/>
+            </div>
+            <div class="field">
+              <label>Акцент 2</label>
+              <input type="color" id="tAccent2"/>
+            </div>
+            <div class="field">
+              <label>Фон страницы</label>
+              <input type="color" id="tPageBg"/>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Радиус <span class="mini" id="tRadiusVal"></span></label>
+              <input type="range" id="tRadius" min="8" max="24" value="16"/>
+            </div>
+            <div class="field">
+              <label>Толщина рамки <span class="mini" id="tBorderWVal"></span></label>
+              <input type="range" id="tBorderW" min="1" max="4" value="1"/>
+            </div>
+            <div class="field">
+              <label>Тень <span class="mini" id="tShadowVal"></span></label>
+              <input type="range" id="tShadow" min="0" max="80" value="40"/>
+            </div>
+            <div class="field">
+              <label>Свечение <span class="mini" id="tGlowVal"></span></label>
+              <input type="range" id="tGlow" min="0" max="40" value="0"/>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Пользовательский CSS</label>
+            <textarea id="tCustomCss" spellcheck="false" placeholder="/* CSS overrides */"></textarea>
+            <div class="help">Сохраняется локально. Можно менять отступы/шрифты/орнаменты без правки файлов.</div>
+          </div>
+
+          <div class="row">
+            <button class="btn primary" id="tSave">Сохранить тему</button>
+            <button class="btn ghost" id="tClose">Закрыть</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right -->
+    <section class="stage">
+      <div class="stage-top">
+        <div class="note">Перетаскивай окно за заголовок. Resize — за правый нижний угол. Двойной клик по заголовку: центр по X.</div>
+      </div>
+
+      <div class="art-wrap">
+        <div class="artboard" id="artboard">
+          <div class="grid-overlay" id="gridOverlay"></div>
+          <div class="sys-window" id="sysWindow"></div>
+        </div>
+      </div>
+
+      <footer class="foot">
+        <div class="help">
+          Экспорт PNG: «Окно» — прозрачный фон; «Холст» — со сценой. Для стабильного результата включи «Заморозить анимации при экспорте».
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <style id="customCssSlot"></style>
+  <script src="/static/app.js"></script>
+</body>
+</html>

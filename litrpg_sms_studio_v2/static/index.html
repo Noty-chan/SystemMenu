@@ -42,6 +42,16 @@
       </div>
 
       <div class="bar-group">
+        <div class="lbl">Масштаб</div>
+        <select id="uiCanvasZoom">
+          <option value="0.75">75%</option>
+          <option value="1" selected>100%</option>
+          <option value="1.25">125%</option>
+          <option value="1.5">150%</option>
+        </select>
+      </div>
+
+      <div class="bar-group">
         <div class="lbl">Экспорт</div>
         <select id="uiExportTarget">
           <option value="window">Окно</option>
@@ -117,6 +127,17 @@
             <button class="btn small ghost" id="uiFitWindow">Высота: авто</button>
             <button class="btn small ghost" id="uiWideWindow">Ширина 60%</button>
           </div>
+        </div>
+
+        <div class="field">
+          <label>Элементы на холсте</label>
+          <div class="row" style="align-items:stretch; gap:6px;">
+            <select id="uiLayerSelect" style="min-width:160px;"></select>
+            <button class="btn small" id="uiAddLayer">Добавить</button>
+            <button class="btn small ghost" id="uiCloneLayer">Дублировать</button>
+            <button class="btn small danger" id="uiRemoveLayer">Удалить</button>
+          </div>
+          <div class="help">Клик по окну выбирает его. Можно собирать несколько окон на одном холсте.</div>
         </div>
 
         <div id="uiFields"></div>

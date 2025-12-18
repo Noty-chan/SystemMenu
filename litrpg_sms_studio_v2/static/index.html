@@ -78,6 +78,47 @@
         </div>
       </div>
       <div class="panel-body">
+        <div class="hero">
+          <div>
+            <div class="eyebrow">Мини‑приложение</div>
+            <div class="hero-title">Создавай и редактируй системные окна</div>
+            <div class="hero-desc">Выбери тип, настрой поля, двинь окно на холсте и экспортируй PNG — всё без сторонних фреймворков.</div>
+          </div>
+          <div class="meta-line">
+            <span class="chip" id="uiMetaType"></span>
+            <span class="chip ghost" id="uiMetaTheme"></span>
+            <span class="chip ghost" id="uiMetaCanvas"></span>
+            <span class="chip ghost" id="uiMetaWindow"></span>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Быстрый старт</label>
+          <div class="quick-grid" id="uiQuickStarts"></div>
+          <div class="help">Клик — загрузить сцену с готовыми полями, позицией, FX и темой. Удобно, чтобы быстрее «завести» макет.</div>
+        </div>
+
+        <div class="field">
+          <label>Тип и назначение</label>
+          <div class="type-meta">
+            <div class="type-meta-head">
+              <div class="type-meta-title" id="uiTypeTitle"></div>
+              <div class="chips" id="uiTypeChips"></div>
+            </div>
+            <div class="type-meta-desc" id="uiTypeDesc"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Позиция и размер</label>
+          <div class="layout-stats" id="uiLayoutStats"></div>
+          <div class="row">
+            <button class="btn small ghost" id="uiCenterWindow">Центр по холсту</button>
+            <button class="btn small ghost" id="uiFitWindow">Высота: авто</button>
+            <button class="btn small ghost" id="uiWideWindow">Ширина 60%</button>
+          </div>
+        </div>
+
         <div id="uiFields"></div>
 
         <div class="sep"></div>
@@ -92,6 +133,24 @@
           <label>Блоки</label>
           <div class="toolbar" id="uiBlocks"></div>
           <div class="help">Вставляет готовые шаблоны: pill/tag и т.п.</div>
+        </div>
+
+        <div class="field">
+          <label>Пользовательские блоки</label>
+          <div class="custom-blocks">
+            <input type="text" id="uiBlockLabel" placeholder="Название блока"/>
+            <select id="uiBlockType">
+              <option value="pill:accent">Pill: акцент</option>
+              <option value="pill:warn">Pill: предупреждение</option>
+              <option value="pill:plain">Pill: обычный</option>
+              <option value="tag">Tag</option>
+              <option value="bullet">Маркер списка</option>
+            </select>
+            <input type="text" id="uiBlockText" placeholder="Текст/значение"/>
+            <button class="btn small" id="uiAddBlock">Добавить</button>
+          </div>
+          <div class="toolbar" id="uiCustomBlocks"></div>
+          <div class="help">Хранится в браузере. Правый клик по блоку — удалить. Удобно для собственных тэгов, меток и шаблонов.</div>
         </div>
 
         <div class="sep"></div>

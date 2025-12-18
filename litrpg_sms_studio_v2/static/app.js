@@ -54,6 +54,38 @@ const BUILTIN_THEMES = {
       "--glow-size": "0px",
       "--glow-alpha": "0.00"
     }
+  },
+  "Holo Amber": {
+    vars: {
+      "--page-bg": "#0B0B0C",
+      "--panel-bg": "rgba(18, 16, 12, 0.92)",
+      "--panel-ink": "#F5E7D0",
+      "--panel-muted": "rgba(245, 231, 208, 0.68)",
+      "--border": "rgba(255, 186, 107, 0.35)",
+      "--border-w": "1px",
+      "--accent": "#F7B267",
+      "--accent-2": "#FF6B6B",
+      "--radius": "18px",
+      "--shadow-alpha": "0.50",
+      "--glow-size": "14px",
+      "--glow-alpha": "0.12"
+    }
+  },
+  "Retro Jade": {
+    vars: {
+      "--page-bg": "#050807",
+      "--panel-bg": "rgba(7, 18, 14, 0.92)",
+      "--panel-ink": "#D2FFDE",
+      "--panel-muted": "rgba(210, 255, 222, 0.70)",
+      "--border": "rgba(90, 255, 170, 0.30)",
+      "--border-w": "1px",
+      "--accent": "#63E6BE",
+      "--accent-2": "#A6F750",
+      "--radius": "14px",
+      "--shadow-alpha": "0.42",
+      "--glow-size": "10px",
+      "--glow-alpha": "0.10"
+    }
   }
 };
 
@@ -74,11 +106,133 @@ const BLOCKS = [
   {label:"• пункт", value:"\n- пункт\n"}
 ];
 
+function makeBlockValue(kind, body){
+  const text = body || "Текст";
+  if(kind.startsWith("pill:")){
+    const t = kind.split(":")[1] || "accent";
+    return `[[pill:${t}:${text}]]`;
+  }
+  if(kind === "tag") return `[[tag:${text}]]`;
+  if(kind === "bullet") return `\n- ${text}\n`;
+  return text;
+}
+
+const TYPE_META = {
+  character: {
+    title: "Статус/персонаж",
+    desc: "Большое окно со ресурсами, атрибутами, эффектами и валютой. Подходит для сцен с подробным разбором состояния героя.",
+    chips: ["профиль", "ресурсы", "эффекты", "валюта"]
+  },
+  system_toast: {
+    title: "Системное уведомление",
+    desc: "Компактный toast с уровнем важности. Хорош для быстрых событий, начислений опыта или предупреждений.",
+    chips: ["алерт", "короткое сообщение", "иконки"]
+  },
+  quest_card: {
+    title: "Квест",
+    desc: "Карточка с названием, целями, наградами и, при желании, предупреждением. Помогает быстро сверстать задания.",
+    chips: ["цели", "чеклист", "награды"]
+  },
+  log_panel: {
+    title: "Логи",
+    desc: "Список событий в формате log feed. Можно выводить хронику боя, подключения или действий системы.",
+    chips: ["время", "статус", "скролл"]
+  },
+  global_banner: {
+    title: "Глобальный баннер",
+    desc: "Широкое уведомление для анонсов, открытия зон, глобальных событий.",
+    chips: ["центрирование", "крупный текст"]
+  },
+  ability_window: {
+    title: "Способность/класс",
+    desc: "Описание с редкостью, стоимостью и эффектами. Формат для навыков, классов или предметов с активным действием.",
+    chips: ["эффекты", "стоимость", "кд"]
+  },
+  loot_window: {
+    title: "Лут/награда",
+    desc: "Слот под предметы и их свойства. Добавь flavour-текст и редкость для атмосферы.",
+    chips: ["дроп", "редкость", "описание"]
+  }
+};
+
+const QUICK_STARTS = [
+  {
+    name: "Статус: рейд",
+    type: "character",
+    theme: "HUD Slate",
+    fxMode: "scanlines",
+    fxIntensity: 1.1,
+    canvas: "2560x1440",
+    pos: {x:140, y:80, w:620, h:0},
+    data: {
+      title: "STATUS",
+      subtitle: "РАЙД • СОСТОЯНИЕ",
+      name: "Бриз",
+      klass: "Сталкер",
+      level: "54",
+      title2: "Кромка Ночи",
+      resources: "HP: 412/520\nMP: 170/220\nSTAM: 230/280\nXP: 1210/3200",
+      attributes: "Сила: 22\nЛовкость: 28\nИнтеллект: 18\nВыносливость: 24\nВоля: 16\nУдача: 14",
+      effects: "- баф: ==«Точность +12%»== (3:20)\n- дебаф: ~~Слабость к огню~~ (1:05)",
+      achievements: "- «Драка под куполом»\n- «Испытание ветром»",
+      quests: "- [[tag:RAID]] Сердце Механизма\n- [[tag:SIDE]] Сбор сигналов",
+      currencies: "Золото: 742\nКредиты: 128"
+    }
+  },
+  {
+    name: "Тревога системы",
+    type: "system_toast",
+    theme: "Retro Jade",
+    fxMode: "glitch",
+    fxIntensity: 1.2,
+    pos: {x:90, y:70, w:420, h:0},
+    data: {
+      title: "SYSTEM",
+      subtitle: "CRITICAL ALERT",
+      severity: "danger",
+      message: "Зафиксировано проникновение\n[[pill:warn:Код: 0xAF12]]\n==Изолируй сектор== и обнули соединения."
+    }
+  },
+  {
+    name: "Дневной квест",
+    type: "quest_card",
+    theme: "Parchment Dusk",
+    fxMode: "lag",
+    fxIntensity: 0.9,
+    pos: {x:120, y:90, w:560, h:0},
+    data: {
+      title: "QUEST",
+      subtitle: "КАЖДЫЙ ДЕНЬ",
+      questName: "«Утренний ритуал»",
+      questDesc: "Перед рассветом проведи серию разминок, чтобы поймать темп дня.",
+      objectives: "[x] Контрастный душ\n[x] 30 минут чтения\n[ ] Силовая: 3×12\n[ ] Кардио: 15 минут",
+      rewards: "- +50 XP\n- +Настрой: ==Сосредоточенность== (1 час)\n- [[pill:accent:Малая удача]]",
+      warning: "Пропуск лишает бонуса «Сосредоточенность»."
+    }
+  },
+  {
+    name: "Дроп: редкий",
+    type: "loot_window",
+    theme: "Holo Amber",
+    fxMode: "none",
+    pos: {x:160, y:110, w:520, h:0},
+    data: {
+      title: "LOOT",
+      subtitle: "НАГРАДА",
+      item: "Клинок Памяти",
+      rarity: "Редкий",
+      props: "- +8 к ловкости\n- [[pill:accent:Актив]] Отпечаток: повтори последнюю атаку\n- [[pill:plain:Особое]] Остывает 30 секунд",
+      flavor: "Клинок дрожит, будто помнит прошлые битвы. Чем больше воспоминаний, тем ярче сияет кромка."
+    }
+  }
+];
+
 // LocalStorage keys
 const LS_STATE  = "sms_v2_state";
 const LS_THEMES = "sms_v2_themes";
 const LS_PRESETS= "sms_v2_presets";
 const LS_CSS    = "sms_v2_custom_css";
+const LS_BLOCKS = "sms_v2_blocks";
 
 // UI
 const ui = {
@@ -110,6 +264,11 @@ const ui = {
   markers: document.getElementById("uiMarkers"),
   blocks: document.getElementById("uiBlocks"),
   presets: document.getElementById("uiPresets"),
+  customBlocks: document.getElementById("uiCustomBlocks"),
+  blockLabel: document.getElementById("uiBlockLabel"),
+  blockType: document.getElementById("uiBlockType"),
+  blockText: document.getElementById("uiBlockText"),
+  addBlock: document.getElementById("uiAddBlock"),
 
   savePreset: document.getElementById("uiSavePreset"),
   exportJson: document.getElementById("uiExportJson"),
@@ -124,6 +283,20 @@ const ui = {
   artboard: document.getElementById("artboard"),
   gridOverlay: document.getElementById("gridOverlay"),
   sysWindow: document.getElementById("sysWindow"),
+
+  // Meta / quick start
+  metaType: document.getElementById("uiMetaType"),
+  metaTheme: document.getElementById("uiMetaTheme"),
+  metaCanvas: document.getElementById("uiMetaCanvas"),
+  metaWindow: document.getElementById("uiMetaWindow"),
+  quickStarts: document.getElementById("uiQuickStarts"),
+  typeTitle: document.getElementById("uiTypeTitle"),
+  typeDesc: document.getElementById("uiTypeDesc"),
+  typeChips: document.getElementById("uiTypeChips"),
+  layoutStats: document.getElementById("uiLayoutStats"),
+  centerWindow: document.getElementById("uiCenterWindow"),
+  fitWindow: document.getElementById("uiFitWindow"),
+  wideWindow: document.getElementById("uiWideWindow"),
 
   // Theme editor
   themeEditor: document.getElementById("themeEditor"),
@@ -669,6 +842,7 @@ const DEFAULT_STATE = {
   freezeFxOnExport: true,
 
   pos: {x:120, y:90, w:540, h:0},
+  pageIndex: 0,
   dataByType: {}
 };
 
@@ -686,6 +860,7 @@ function loadState(){
       state = {...deepClone(DEFAULT_STATE), ...s};
       // Ensure dataByType exists
       if(!state.dataByType || typeof state.dataByType !== "object") state.dataByType = {};
+      if(typeof state.pageIndex !== "number") state.pageIndex = 0;
     }
   }catch(e){}
 }
@@ -739,6 +914,12 @@ function loadPresets(){
 }
 function savePresets(list){
   localStorage.setItem(LS_PRESETS, JSON.stringify(list));
+}
+function loadBlocks(){
+  return JSON.parse(localStorage.getItem(LS_BLOCKS) || "[]");
+}
+function saveBlocks(list){
+  localStorage.setItem(LS_BLOCKS, JSON.stringify(list));
 }
 
 function setCssVars(vars){
@@ -800,6 +981,7 @@ function setCanvas(sizeStr){
   ui.artboard.dataset.scale = String(scale);
 
   applyWindowRectFromState();
+  updateLayoutStats();
   saveState();
 }
 
@@ -811,6 +993,7 @@ function applyWindowRectFromState(){
   ui.sysWindow.style.top  = (state.pos.y * s) + "px";
   ui.sysWindow.style.width= (state.pos.w * s) + "px";
   ui.sysWindow.style.height = (state.pos.h && state.pos.h > 0) ? (state.pos.h * s) + "px" : "auto";
+  updateLayoutStats();
 }
 
 function captureWindowRectToState(){
@@ -823,6 +1006,7 @@ function captureWindowRectToState(){
   const h = ui.sysWindow.style.height && ui.sysWindow.style.height !== "auto" ? (r.height / s) : 0;
   state.pos = {x,y,w,h};
   saveState();
+  updateLayoutStats();
 }
 
 function snap8(v){ return Math.round(v / 8) * 8; }
@@ -875,6 +1059,32 @@ function bindDrag(){
   ui.sysWindow.onmouseup = () => captureWindowRectToState();
 }
 
+function centerWindowOnCanvas(){
+  const a = ui.artboard.getBoundingClientRect();
+  const w = ui.sysWindow.getBoundingClientRect().width;
+  const h = ui.sysWindow.getBoundingClientRect().height;
+  ui.sysWindow.style.left = Math.max(0, (a.width - w) / 2) + "px";
+  ui.sysWindow.style.top = Math.max(0, (a.height - h) / 2) + "px";
+  captureWindowRectToState();
+  pushHistory();
+}
+
+function autoHeightWindow(){
+  ui.sysWindow.style.height = "auto";
+  state.pos.h = 0;
+  captureWindowRectToState();
+  pushHistory();
+}
+
+function setWindowWidthRatio(ratio){
+  const a = ui.artboard.getBoundingClientRect();
+  const newW = Math.max(360, a.width * ratio);
+  ui.sysWindow.style.width = newW + "px";
+  ui.sysWindow.style.height = "auto";
+  captureWindowRectToState();
+  pushHistory();
+}
+
 function setFxClasses(){
   ui.sysWindow.classList.remove("fx-lag","fx-glitch","fx-scanlines");
   if(state.fxMode === "lag") ui.sysWindow.classList.add("fx-lag");
@@ -888,6 +1098,126 @@ function setTypeSizeClass(){
   if(state.type === "system_toast") ui.sysWindow.classList.add("type-toast");
   if(state.type === "global_banner") ui.sysWindow.classList.add("type-global");
   if(state.type === "log_panel") ui.sysWindow.classList.add("type-logs");
+}
+
+function renderTypeMeta(){
+  const meta = TYPE_META[state.type] || {};
+  ui.typeTitle.textContent = meta.title || (WINDOW_TYPES[state.type]?.label || "Тип окна");
+  ui.typeDesc.textContent = meta.desc || "Настрой поля и сохрани пресет.";
+  ui.typeChips.innerHTML = "";
+  (meta.chips || []).forEach(c => {
+    const chip = document.createElement("div");
+    chip.className = "chip ghost";
+    chip.textContent = c;
+    ui.typeChips.appendChild(chip);
+  });
+}
+
+function updateMetaBar(){
+  const typeLabel = WINDOW_TYPES[state.type]?.label || state.type;
+  const [cw,ch] = String(state.canvas || "1920x1080").split("x").map(Number);
+  const winW = state.pos.w || Math.round(ui.sysWindow.getBoundingClientRect().width / scale());
+  const winH = state.pos.h ? state.pos.h : Math.round(ui.sysWindow.getBoundingClientRect().height / scale());
+
+  ui.metaType.textContent = typeLabel;
+  ui.metaTheme.textContent = `Тема: ${state.theme}`;
+  ui.metaCanvas.textContent = `Холст: ${cw}×${ch}`;
+  const pages = parseInt(ui.sysWindow.dataset.pages || "1", 10);
+  const pageInfo = pages > 1 ? `страницы ${state.pageIndex+1}/${pages}` : "1 страница";
+  ui.metaWindow.textContent = `Окно: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"} • X ${Math.round(state.pos.x)}, Y ${Math.round(state.pos.y)} • ${pageInfo}`;
+
+  ui.layoutStats.textContent = [
+    `pos: ${Math.round(state.pos.x)}×${Math.round(state.pos.y)}px`,
+    `size: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"}`,
+    state.snap ? "snap: on" : "snap: off",
+    pages > 1 ? `pages: ${state.pageIndex+1}/${pages}` : "pages: 1"
+  ].join(" • ");
+}
+
+function buildQuickStarts(){
+  ui.quickStarts.innerHTML = "";
+  QUICK_STARTS.forEach(q => {
+    const card = document.createElement("div");
+    card.className = "preset-card";
+    const typeLabel = WINDOW_TYPES[q.type]?.label || q.type;
+    card.innerHTML = `
+      <div class="title">${escapeHtml(q.name)}</div>
+      <div class="meta">
+        <span>${escapeHtml(typeLabel)}</span>
+        <span>Тема: ${escapeHtml(q.theme)}</span>
+        <span>${q.fxMode !== "none" ? `FX: ${escapeHtml(q.fxMode)}` : "FX: off"}</span>
+      </div>
+    `;
+    card.addEventListener("click", () => applyQuickStart(q));
+    ui.quickStarts.appendChild(card);
+  });
+}
+
+function applyQuickStart(preset){
+  const def = WINDOW_TYPES[preset.type];
+  if(!def) return;
+
+  if(!state.dataByType[preset.type]) state.dataByType[preset.type] = deepClone(def.defaults);
+  state.type = preset.type;
+  state.theme = preset.theme || state.theme;
+  state.fxMode = preset.fxMode ?? "none";
+  state.fxIntensity = preset.fxIntensity ?? state.fxIntensity;
+  state.canvas = preset.canvas || state.canvas;
+  state.corruptAmount = preset.corruptAmount ?? state.corruptAmount;
+  state.pageIndex = 0;
+
+  state.dataByType[preset.type] = {...deepClone(def.defaults), ...(preset.data || {})};
+  if(preset.pos) state.pos = deepClone(preset.pos);
+
+  saveState();
+  syncUIFromState();
+  renderAll();
+  pushHistory();
+}
+
+function updateLayoutStats(){
+  updateMetaBar();
+}
+
+function setupPaging(){
+  const viewport = ui.sysWindow.querySelector(".page-viewport");
+  const track = ui.sysWindow.querySelector(".page-track");
+  const nav = ui.sysWindow.querySelector(".page-nav");
+  if(!viewport || !track || !nav) return 1;
+
+  const maxAllowed = Math.max(320, ui.artboard.clientHeight - 60);
+  const targetH = Math.min(track.scrollHeight, maxAllowed);
+  viewport.style.height = targetH + "px";
+
+  const pageHeight = viewport.clientHeight || targetH;
+  const pages = Math.max(1, Math.ceil(track.scrollHeight / pageHeight));
+  ui.sysWindow.dataset.pages = String(pages);
+  ui.sysWindow.dataset.pageHeight = String(pageHeight);
+  if(state.pageIndex >= pages) state.pageIndex = pages - 1;
+
+  function applyPage(idx){
+    state.pageIndex = Math.max(0, Math.min(idx, pages - 1));
+    track.style.transform = `translateY(-${pageHeight * state.pageIndex}px)`;
+    const dots = nav.querySelector(".page-dots");
+    dots.innerHTML = "";
+    for(let i=0;i<pages;i++){
+      const d = document.createElement("div");
+      d.className = "page-dot" + (i === state.pageIndex ? " active" : "");
+      d.addEventListener("click", () => applyPage(i));
+      dots.appendChild(d);
+    }
+    const label = nav.querySelector(".page-label");
+    label.textContent = pages > 1 ? `Страница ${state.pageIndex+1}/${pages}` : "";
+    nav.hidden = pages <= 1;
+    saveState();
+  }
+
+  nav.querySelectorAll(".page-btn").forEach(btn => {
+    btn.onclick = () => applyPage(state.pageIndex + Number(btn.dataset.dir || "0"));
+  });
+
+  applyPage(state.pageIndex);
+  return pages;
 }
 
 // Build selectors
@@ -925,13 +1255,35 @@ function buildMarkers(){
 
 function buildBlocks(){
   ui.blocks.innerHTML = "";
-  for(const blk of BLOCKS){
+  const custom = loadBlocks();
+  const combined = [...BLOCKS, ...custom];
+  for(const blk of combined){
     const b = document.createElement("div");
     b.className = "kbd";
     b.textContent = blk.label;
     b.addEventListener("click", () => insertToken(blk.value));
     ui.blocks.appendChild(b);
   }
+  renderCustomBlocks();
+}
+
+function renderCustomBlocks(){
+  const list = loadBlocks();
+  ui.customBlocks.innerHTML = "";
+  list.forEach((blk, idx) => {
+    const b = document.createElement("div");
+    b.className = "kbd";
+    b.textContent = blk.label;
+    b.title = blk.value;
+    b.addEventListener("click", () => insertToken(blk.value));
+    b.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const rest = loadBlocks().filter((_, j) => j !== idx);
+      saveBlocks(rest);
+      buildBlocks();
+    });
+    ui.customBlocks.appendChild(b);
+  });
 }
 
 function buildFields(){
@@ -1030,7 +1382,18 @@ function renderWindow(){
   setFxClasses();
 
   const data = state.dataByType[state.type] || def.defaults;
-  ui.sysWindow.innerHTML = def.render(data);
+  const inner = def.render(data);
+  ui.sysWindow.innerHTML = `
+    <div class="page-viewport">
+      <div class="page-track">${inner}</div>
+    </div>
+    <div class="page-nav" data-role="pager" hidden>
+      <button class="page-btn" data-dir="-1">←</button>
+      <div class="page-dots"></div>
+      <button class="page-btn" data-dir="1">→</button>
+      <div class="page-label"></div>
+    </div>
+  `;
 
   // re-apply rect after re-render
   applyWindowRectFromState();
@@ -1044,8 +1407,11 @@ function renderWindow(){
     blocks.forEach(b => applyCorruptionTo(b, amt, seed + i++ * 10007));
   }
 
+  setupPaging();
+
   // ensure title has data-text for glitch overlay (already set in templates)
   bindDrag();
+  updateLayoutStats();
 }
 
 function renderGrid(){
@@ -1060,6 +1426,8 @@ function renderAll(){
   buildFields();
   refreshPresets();
   renderWindow();
+  renderTypeMeta();
+  updateLayoutStats();
   syncFxLabels();
 }
 
@@ -1279,6 +1647,23 @@ ui.importJson.addEventListener("change", async (e) => {
   }
 });
 
+ui.addBlock.addEventListener("click", () => {
+  const label = (ui.blockLabel.value || ui.blockText.value || "").trim();
+  const body = (ui.blockText.value || "").trim();
+  const kind = ui.blockType.value || "pill:accent";
+  if(!label && !body){
+    alert("Заполни название или текст блока.");
+    return;
+  }
+  const value = makeBlockValue(kind, body || label);
+  const list = loadBlocks();
+  list.push({label: label || value, value});
+  saveBlocks(list);
+  ui.blockLabel.value = "";
+  ui.blockText.value = "";
+  buildBlocks();
+});
+
 // Presets
 ui.savePreset.addEventListener("click", () => {
   captureWindowRectToState();
@@ -1312,8 +1697,11 @@ ui.reset.addEventListener("click", () => {
 // Controls wiring
 ui.type.addEventListener("change", () => {
   state.type = ui.type.value;
+  state.pageIndex = 0;
   buildFields();
   renderWindow();
+  renderTypeMeta();
+  updateLayoutStats();
   saveState();
   pushHistory();
 });
@@ -1329,6 +1717,8 @@ ui.theme.addEventListener("change", () => {
 ui.canvas.addEventListener("change", () => {
   setCanvas(ui.canvas.value);
   renderWindow();
+  renderTypeMeta();
+  updateLayoutStats();
   pushHistory();
 });
 
@@ -1383,6 +1773,7 @@ ui.freezeSeed.addEventListener("click", () => {
 ui.snap.addEventListener("change", () => {
   state.snap = ui.snap.checked;
   saveState();
+  updateLayoutStats();
 });
 ui.grid.addEventListener("change", () => {
   state.showGrid = ui.grid.checked;
@@ -1393,6 +1784,10 @@ ui.freezeFx.addEventListener("change", () => {
   state.freezeFxOnExport = ui.freezeFx.checked;
   saveState();
 });
+
+ui.centerWindow.addEventListener("click", centerWindowOnCanvas);
+ui.fitWindow.addEventListener("click", autoHeightWindow);
+ui.wideWindow.addEventListener("click", () => setWindowWidthRatio(0.6));
 
 ui.undo.addEventListener("click", undo);
 ui.redo.addEventListener("click", redo);
@@ -1469,6 +1864,7 @@ function init(){
   buildThemeSelect();
   buildMarkers();
   buildBlocks();
+  buildQuickStarts();
 
   // Apply state
   syncUIFromState();

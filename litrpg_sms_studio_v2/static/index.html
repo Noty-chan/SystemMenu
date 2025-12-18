@@ -135,6 +135,24 @@
           <div class="help">Вставляет готовые шаблоны: pill/tag и т.п.</div>
         </div>
 
+        <div class="field">
+          <label>Пользовательские блоки</label>
+          <div class="custom-blocks">
+            <input type="text" id="uiBlockLabel" placeholder="Название блока"/>
+            <select id="uiBlockType">
+              <option value="pill:accent">Pill: акцент</option>
+              <option value="pill:warn">Pill: предупреждение</option>
+              <option value="pill:plain">Pill: обычный</option>
+              <option value="tag">Tag</option>
+              <option value="bullet">Маркер списка</option>
+            </select>
+            <input type="text" id="uiBlockText" placeholder="Текст/значение"/>
+            <button class="btn small" id="uiAddBlock">Добавить</button>
+          </div>
+          <div class="toolbar" id="uiCustomBlocks"></div>
+          <div class="help">Хранится в браузере. Правый клик по блоку — удалить. Удобно для собственных тэгов, меток и шаблонов.</div>
+        </div>
+
         <div class="sep"></div>
 
         <div class="field">

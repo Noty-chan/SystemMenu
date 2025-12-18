@@ -106,6 +106,17 @@ const BLOCKS = [
   {label:"• пункт", value:"\n- пункт\n"}
 ];
 
+function makeBlockValue(kind, body){
+  const text = body || "Текст";
+  if(kind.startsWith("pill:")){
+    const t = kind.split(":")[1] || "accent";
+    return `[[pill:${t}:${text}]]`;
+  }
+  if(kind === "tag") return `[[tag:${text}]]`;
+  if(kind === "bullet") return `\n- ${text}\n`;
+  return text;
+}
+
 const TYPE_META = {
   character: {
     title: "Статус/персонаж",
@@ -221,6 +232,7 @@ const LS_STATE  = "sms_v2_state";
 const LS_THEMES = "sms_v2_themes";
 const LS_PRESETS= "sms_v2_presets";
 const LS_CSS    = "sms_v2_custom_css";
+const LS_BLOCKS = "sms_v2_blocks";
 
 // UI
 const ui = {
@@ -252,6 +264,11 @@ const ui = {
   markers: document.getElementById("uiMarkers"),
   blocks: document.getElementById("uiBlocks"),
   presets: document.getElementById("uiPresets"),
+  customBlocks: document.getElementById("uiCustomBlocks"),
+  blockLabel: document.getElementById("uiBlockLabel"),
+  blockType: document.getElementById("uiBlockType"),
+  blockText: document.getElementById("uiBlockText"),
+  addBlock: document.getElementById("uiAddBlock"),
 
   savePreset: document.getElementById("uiSavePreset"),
   exportJson: document.getElementById("uiExportJson"),
@@ -825,6 +842,7 @@ const DEFAULT_STATE = {
   freezeFxOnExport: true,
 
   pos: {x:120, y:90, w:540, h:0},
+  pageIndex: 0,
   dataByType: {}
 };
 
@@ -842,6 +860,7 @@ function loadState(){
       state = {...deepClone(DEFAULT_STATE), ...s};
       // Ensure dataByType exists
       if(!state.dataByType || typeof state.dataByType !== "object") state.dataByType = {};
+      if(typeof state.pageIndex !== "number") state.pageIndex = 0;
     }
   }catch(e){}
 }
@@ -895,6 +914,12 @@ function loadPresets(){
 }
 function savePresets(list){
   localStorage.setItem(LS_PRESETS, JSON.stringify(list));
+}
+function loadBlocks(){
+  return JSON.parse(localStorage.getItem(LS_BLOCKS) || "[]");
+}
+function saveBlocks(list){
+  localStorage.setItem(LS_BLOCKS, JSON.stringify(list));
 }
 
 function setCssVars(vars){
@@ -1097,12 +1122,15 @@ function updateMetaBar(){
   ui.metaType.textContent = typeLabel;
   ui.metaTheme.textContent = `Тема: ${state.theme}`;
   ui.metaCanvas.textContent = `Холст: ${cw}×${ch}`;
-  ui.metaWindow.textContent = `Окно: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"} • X ${Math.round(state.pos.x)}, Y ${Math.round(state.pos.y)}`;
+  const pages = parseInt(ui.sysWindow.dataset.pages || "1", 10);
+  const pageInfo = pages > 1 ? `страницы ${state.pageIndex+1}/${pages}` : "1 страница";
+  ui.metaWindow.textContent = `Окно: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"} • X ${Math.round(state.pos.x)}, Y ${Math.round(state.pos.y)} • ${pageInfo}`;
 
   ui.layoutStats.textContent = [
     `pos: ${Math.round(state.pos.x)}×${Math.round(state.pos.y)}px`,
     `size: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"}`,
-    state.snap ? "snap: on" : "snap: off"
+    state.snap ? "snap: on" : "snap: off",
+    pages > 1 ? `pages: ${state.pageIndex+1}/${pages}` : "pages: 1"
   ].join(" • ");
 }
 
@@ -1136,6 +1164,7 @@ function applyQuickStart(preset){
   state.fxIntensity = preset.fxIntensity ?? state.fxIntensity;
   state.canvas = preset.canvas || state.canvas;
   state.corruptAmount = preset.corruptAmount ?? state.corruptAmount;
+  state.pageIndex = 0;
 
   state.dataByType[preset.type] = {...deepClone(def.defaults), ...(preset.data || {})};
   if(preset.pos) state.pos = deepClone(preset.pos);
@@ -1148,6 +1177,47 @@ function applyQuickStart(preset){
 
 function updateLayoutStats(){
   updateMetaBar();
+}
+
+function setupPaging(){
+  const viewport = ui.sysWindow.querySelector(".page-viewport");
+  const track = ui.sysWindow.querySelector(".page-track");
+  const nav = ui.sysWindow.querySelector(".page-nav");
+  if(!viewport || !track || !nav) return 1;
+
+  const maxAllowed = Math.max(320, ui.artboard.clientHeight - 60);
+  const targetH = Math.min(track.scrollHeight, maxAllowed);
+  viewport.style.height = targetH + "px";
+
+  const pageHeight = viewport.clientHeight || targetH;
+  const pages = Math.max(1, Math.ceil(track.scrollHeight / pageHeight));
+  ui.sysWindow.dataset.pages = String(pages);
+  ui.sysWindow.dataset.pageHeight = String(pageHeight);
+  if(state.pageIndex >= pages) state.pageIndex = pages - 1;
+
+  function applyPage(idx){
+    state.pageIndex = Math.max(0, Math.min(idx, pages - 1));
+    track.style.transform = `translateY(-${pageHeight * state.pageIndex}px)`;
+    const dots = nav.querySelector(".page-dots");
+    dots.innerHTML = "";
+    for(let i=0;i<pages;i++){
+      const d = document.createElement("div");
+      d.className = "page-dot" + (i === state.pageIndex ? " active" : "");
+      d.addEventListener("click", () => applyPage(i));
+      dots.appendChild(d);
+    }
+    const label = nav.querySelector(".page-label");
+    label.textContent = pages > 1 ? `Страница ${state.pageIndex+1}/${pages}` : "";
+    nav.hidden = pages <= 1;
+    saveState();
+  }
+
+  nav.querySelectorAll(".page-btn").forEach(btn => {
+    btn.onclick = () => applyPage(state.pageIndex + Number(btn.dataset.dir || "0"));
+  });
+
+  applyPage(state.pageIndex);
+  return pages;
 }
 
 // Build selectors
@@ -1185,13 +1255,35 @@ function buildMarkers(){
 
 function buildBlocks(){
   ui.blocks.innerHTML = "";
-  for(const blk of BLOCKS){
+  const custom = loadBlocks();
+  const combined = [...BLOCKS, ...custom];
+  for(const blk of combined){
     const b = document.createElement("div");
     b.className = "kbd";
     b.textContent = blk.label;
     b.addEventListener("click", () => insertToken(blk.value));
     ui.blocks.appendChild(b);
   }
+  renderCustomBlocks();
+}
+
+function renderCustomBlocks(){
+  const list = loadBlocks();
+  ui.customBlocks.innerHTML = "";
+  list.forEach((blk, idx) => {
+    const b = document.createElement("div");
+    b.className = "kbd";
+    b.textContent = blk.label;
+    b.title = blk.value;
+    b.addEventListener("click", () => insertToken(blk.value));
+    b.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      const rest = loadBlocks().filter((_, j) => j !== idx);
+      saveBlocks(rest);
+      buildBlocks();
+    });
+    ui.customBlocks.appendChild(b);
+  });
 }
 
 function buildFields(){
@@ -1290,7 +1382,18 @@ function renderWindow(){
   setFxClasses();
 
   const data = state.dataByType[state.type] || def.defaults;
-  ui.sysWindow.innerHTML = def.render(data);
+  const inner = def.render(data);
+  ui.sysWindow.innerHTML = `
+    <div class="page-viewport">
+      <div class="page-track">${inner}</div>
+    </div>
+    <div class="page-nav" data-role="pager" hidden>
+      <button class="page-btn" data-dir="-1">←</button>
+      <div class="page-dots"></div>
+      <button class="page-btn" data-dir="1">→</button>
+      <div class="page-label"></div>
+    </div>
+  `;
 
   // re-apply rect after re-render
   applyWindowRectFromState();
@@ -1304,8 +1407,11 @@ function renderWindow(){
     blocks.forEach(b => applyCorruptionTo(b, amt, seed + i++ * 10007));
   }
 
+  setupPaging();
+
   // ensure title has data-text for glitch overlay (already set in templates)
   bindDrag();
+  updateLayoutStats();
 }
 
 function renderGrid(){
@@ -1541,6 +1647,23 @@ ui.importJson.addEventListener("change", async (e) => {
   }
 });
 
+ui.addBlock.addEventListener("click", () => {
+  const label = (ui.blockLabel.value || ui.blockText.value || "").trim();
+  const body = (ui.blockText.value || "").trim();
+  const kind = ui.blockType.value || "pill:accent";
+  if(!label && !body){
+    alert("Заполни название или текст блока.");
+    return;
+  }
+  const value = makeBlockValue(kind, body || label);
+  const list = loadBlocks();
+  list.push({label: label || value, value});
+  saveBlocks(list);
+  ui.blockLabel.value = "";
+  ui.blockText.value = "";
+  buildBlocks();
+});
+
 // Presets
 ui.savePreset.addEventListener("click", () => {
   captureWindowRectToState();
@@ -1574,6 +1697,7 @@ ui.reset.addEventListener("click", () => {
 // Controls wiring
 ui.type.addEventListener("change", () => {
   state.type = ui.type.value;
+  state.pageIndex = 0;
   buildFields();
   renderWindow();
   renderTypeMeta();

@@ -332,6 +332,8 @@ input[type="range"]{
   border-radius: 16px;
   padding: 12px;
   box-shadow: 0 20px 70px rgba(0,0,0,.20);
+  max-height: calc(100vh - 24px);
+  overflow:auto;
 }
 @media (max-width: 1100px){
   .art-wrap{ position: static; }
@@ -342,7 +344,7 @@ input[type="range"]{
   height: 540px;
   margin: 0 auto;
   border-radius: 14px;
-  overflow:hidden;
+  overflow:auto;
   background:
     linear-gradient(0deg, rgba(255,255,255,.02), rgba(255,255,255,.02)),
     radial-gradient(900px 600px at 40% 25%, rgba(255,255,255,.04), rgba(0,0,0,0) 58%),
@@ -379,10 +381,14 @@ input[type="range"]{
     radial-gradient(420px 280px at 18% 8%, rgba(255,255,255,.06), transparent 65%),
     radial-gradient(380px 260px at 82% 0%, rgba(255,255,255,.05), transparent 65%);
 }
+.sys-window.active{
+  outline: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 var(--shadow-y) var(--shadow-blur) rgba(0,0,0,var(--shadow-alpha)), 0 0 0 1px rgba(255,255,255,.10);
+}
 
 /* Header */
 .w-head{
-  padding: 14px 16px 10px;
+  padding: 12px 16px 8px;
   border-bottom: 1px solid rgba(0,0,0,.12);
   background:
     linear-gradient(90deg, rgba(0,0,0,.06), rgba(0,0,0,0));
@@ -397,18 +403,20 @@ input[type="range"]{
   letter-spacing: .8px;
   text-transform: uppercase;
   font-size: 16px;
+  color: color-mix(in srgb, var(--panel-ink) 88%, #ffffff 12%);
 }
 .w-sub{
-  margin-top: 3px;
+  margin-top: 2px;
   font-family: var(--mono-font);
   font-size: 12px;
-  color: color-mix(in srgb, var(--panel-muted) 70%, #ffffff 30%);
+  color: color-mix(in srgb, var(--panel-muted) 45%, #ffffff 55%);
 }
+.w-sub:empty{ display:none; }
 .w-body{
-  padding: 14px 16px 16px;
+  padding: 12px 16px 14px;
   font-size: 13px;
   line-height: 1.4;
-  color: color-mix(in srgb, var(--panel-ink) 68%, #f7f7f7 32%);
+  color: color-mix(in srgb, var(--panel-ink) 60%, #f7f7f7 40%);
 }
 
 /* UI components inside window */

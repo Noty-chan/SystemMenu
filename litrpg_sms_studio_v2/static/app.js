@@ -106,6 +106,8 @@ const BLOCKS = [
   {label:"• пункт", value:"\n- пункт\n"}
 ];
 
+function deepClone(x){ return JSON.parse(JSON.stringify(x)); }
+
 function makeBlockValue(kind, body){
   const text = body || "Текст";
   if(kind.startsWith("pill:")){
@@ -253,6 +255,7 @@ const ui = {
   freezeFx: document.getElementById("uiFreezeFx"),
 
   canvas: document.getElementById("uiCanvas"),
+  canvasZoom: document.getElementById("uiCanvasZoom"),
   exportTarget: document.getElementById("uiExportTarget"),
   exportScale: document.getElementById("uiExportScale"),
   exportBtn: document.getElementById("uiExport"),
@@ -297,6 +300,10 @@ const ui = {
   centerWindow: document.getElementById("uiCenterWindow"),
   fitWindow: document.getElementById("uiFitWindow"),
   wideWindow: document.getElementById("uiWideWindow"),
+  layerSelect: document.getElementById("uiLayerSelect"),
+  addLayer: document.getElementById("uiAddLayer"),
+  cloneLayer: document.getElementById("uiCloneLayer"),
+  removeLayer: document.getElementById("uiRemoveLayer"),
 
   // Theme editor
   themeEditor: document.getElementById("themeEditor"),
@@ -321,6 +328,8 @@ const ui = {
   customCssSlot: document.getElementById("customCssSlot")
 };
 
+const layerNodes = new Map();
+
 function isTextInput(el){
   if(!el) return false;
   const tag = (el.tagName || "").toLowerCase();
@@ -340,6 +349,9 @@ document.getElementById("fmtAccent").addEventListener("click", () => wrapSelecti
 document.getElementById("fmtUnder").addEventListener("click", () => wrapSelection("++","++"));
 document.getElementById("fmtStrike").addEventListener("click", () => wrapSelection("~~","~~"));
 document.getElementById("fmtCode").addEventListener("click", () => wrapSelection("`","`"));
+document.querySelectorAll(".fmt .btn").forEach(btn => {
+  btn.addEventListener("mousedown", (e) => e.preventDefault());
+});
 
 // Window types
 function parseKV(text){
@@ -675,6 +687,7 @@ const WINDOW_TYPES = {
         ? `<div class="fx-text">${renderMarkup(rewards.join("\n"))}</div>`
         : `<div class="k">Нет наград</div>`;
       const warn = (d.warning||"").trim();
+      const questBadge = (d.questName || "").trim() ? `<span class="pill accent">◆ ${escapeHtml(d.questName)}</span>` : "";
 
       return `
         <div class="w-head draggable">
@@ -682,7 +695,7 @@ const WINDOW_TYPES = {
           <div class="w-sub">${escapeHtml(d.subtitle)}</div>
         </div>
         <div class="w-body">
-          <span class="pill accent">◆ ${escapeHtml(d.questName || "")}</span>
+          ${questBadge}
           <div class="fx-text" style="margin-top:8px;">${renderMarkup(d.questDesc || "")}</div>
 
           <div class="sep"></div>
@@ -777,19 +790,20 @@ const WINDOW_TYPES = {
     },
     render(d){
       const effects = (d.effects||"").split("\n").map(x=>x.trim()).filter(Boolean);
+      const pills = [
+        d.name ? `<span class="pill accent">◆ ${escapeHtml(d.name)}</span>` : "",
+        d.rarity ? `<span class="pill">${escapeHtml(d.rarity)}</span>` : "",
+        d.cost ? `<span class="pill">${escapeHtml(d.cost)}</span>` : "",
+        d.cooldown ? `<span class="pill">${escapeHtml(d.cooldown)}</span>` : ""
+      ].filter(Boolean).join("");
       return `
         <div class="w-head draggable">
           <div class="w-title" data-text="${escapeHtml(d.title)}">${escapeHtml(d.title)}</div>
           <div class="w-sub">${escapeHtml(d.subtitle)}</div>
         </div>
         <div class="w-body">
-          <div class="row">
-            <span class="pill accent">◆ ${escapeHtml(d.name || "")}</span>
-            <span class="pill">${escapeHtml(d.rarity || "")}</span>
-            <span class="pill">${escapeHtml(d.cost || "")}</span>
-            <span class="pill">${escapeHtml(d.cooldown || "")}</span>
-          </div>
-          <div class="fx-text" style="margin-top:10px;">${renderMarkup(d.desc || "")}</div>
+          ${pills ? `<div class="row">${pills}</div>` : ""}
+          <div class="fx-text" style="margin-top:${pills ? "10" : "6"}px;">${renderMarkup(d.desc || "")}</div>
           ${effects.length ? `<div class="fx-text">${renderMarkup(effects.join("\n"))}</div>` : ""}
         </div>
       `;
@@ -816,16 +830,17 @@ const WINDOW_TYPES = {
     },
     render(d){
       const props = (d.props||"").split("\n").map(x=>x.trim()).filter(Boolean);
+      const pills = [
+        d.item ? `<span class="pill accent">◆ ${escapeHtml(d.item)}</span>` : "",
+        d.rarity ? `<span class="pill">${escapeHtml(d.rarity)}</span>` : ""
+      ].filter(Boolean).join("");
       return `
         <div class="w-head draggable">
           <div class="w-title" data-text="${escapeHtml(d.title)}">${escapeHtml(d.title)}</div>
           <div class="w-sub">${escapeHtml(d.subtitle)}</div>
         </div>
         <div class="w-body">
-          <div class="row">
-            <span class="pill accent">◆ ${escapeHtml(d.item || "")}</span>
-            <span class="pill">${escapeHtml(d.rarity || "")}</span>
-          </div>
+          ${pills ? `<div class="row">${pills}</div>` : ""}
           ${props.length ? `<div class="fx-text">${renderMarkup(props.join("\n"))}</div>` : ""}
           ${d.flavor ? `<div class="sep"></div><div class="k">Описание</div><div class="fx-text" style="margin-top:6px;">${renderMarkup(d.flavor)}</div>` : ""}
         </div>
@@ -834,28 +849,44 @@ const WINDOW_TYPES = {
   }
 };
 
+function buildDefaultDataByType(){
+  const out = {};
+  Object.entries(WINDOW_TYPES).forEach(([id, def]) => {
+    out[id] = deepClone(def.defaults);
+  });
+  return out;
+}
+
+function makeLayer(partial = {}){
+  return {
+    id: partial.id || `layer-${Math.random().toString(36).slice(2,7)}`,
+    type: partial.type || "character",
+    theme: partial.theme || "Parchment Dusk",
+    fxMode: partial.fxMode || "none",
+    fxIntensity: partial.fxIntensity ?? 0.8,
+    corruptAmount: partial.corruptAmount ?? 0.0,
+    corruptSeed: partial.corruptSeed ?? 123456,
+    seedFrozen: partial.seedFrozen ?? true,
+    pos: deepClone(partial.pos || {x:120, y:90, w:540, h:0}),
+    pageIndex: partial.pageIndex || 0,
+    dataByType: {...buildDefaultDataByType(), ...(partial.dataByType || {})}
+  };
+}
+
 // State + history
 const DEFAULT_STATE = {
-  type: "character",
-  theme: "Parchment Dusk",
   canvas: "1920x1080",
+  canvasZoom: 1,
 
   exportTarget: "window",
   exportScale: 2,
-
-  fxMode: "none",
-  fxIntensity: 0.8,
-  corruptAmount: 0.0,
-  corruptSeed: 123456,
-  seedFrozen: true,
 
   snap: false,
   showGrid: false,
   freezeFxOnExport: true,
 
-  pos: {x:120, y:90, w:540, h:0},
-  pageIndex: 0,
-  dataByType: {}
+  layers: [makeLayer({id:"layer-1"})],
+  activeLayerId: "layer-1"
 };
 
 let state = deepClone(DEFAULT_STATE);
@@ -863,16 +894,42 @@ let state = deepClone(DEFAULT_STATE);
 let history = [];
 let historyIdx = -1;
 
-function deepClone(x){ return JSON.parse(JSON.stringify(x)); }
+function ensureLayersIntegrity(){
+  if(!Array.isArray(state.layers) || !state.layers.length){
+    const fallback = makeLayer();
+    state.layers = [fallback];
+    state.activeLayerId = fallback.id;
+  }else{
+    state.layers = state.layers.map(l => makeLayer(l));
+    if(!state.activeLayerId || !state.layers.some(l => l.id === state.activeLayerId)){
+      state.activeLayerId = state.layers[0].id;
+    }
+  }
+}
 
 function loadState(){
   try{
     const s = JSON.parse(localStorage.getItem(LS_STATE) || "null");
     if(s && typeof s === "object"){
-      state = {...deepClone(DEFAULT_STATE), ...s};
-      // Ensure dataByType exists
-      if(!state.dataByType || typeof state.dataByType !== "object") state.dataByType = {};
-      if(typeof state.pageIndex !== "number") state.pageIndex = 0;
+      const migrated = {...s};
+      if(!Array.isArray(migrated.layers)){
+        const legacy = makeLayer({
+          type: migrated.type,
+          theme: migrated.theme,
+          fxMode: migrated.fxMode,
+          fxIntensity: migrated.fxIntensity,
+          corruptAmount: migrated.corruptAmount,
+          corruptSeed: migrated.corruptSeed,
+          seedFrozen: migrated.seedFrozen,
+          pos: migrated.pos,
+          pageIndex: migrated.pageIndex,
+          dataByType: migrated.dataByType
+        });
+        migrated.layers = [legacy];
+        migrated.activeLayerId = legacy.id;
+      }
+      state = {...deepClone(DEFAULT_STATE), ...migrated};
+      ensureLayersIntegrity();
     }
   }catch(e){}
 }
@@ -897,6 +954,7 @@ function undo(){
   if(historyIdx <= 0) return;
   historyIdx--;
   state = deepClone(history[historyIdx]);
+  ensureLayersIntegrity();
   syncUIFromState();
   renderAll();
 }
@@ -905,6 +963,7 @@ function redo(){
   if(historyIdx >= history.length - 1) return;
   historyIdx++;
   state = deepClone(history[historyIdx]);
+  ensureLayersIntegrity();
   syncUIFromState();
   renderAll();
 }
@@ -919,6 +978,54 @@ function saveThemes(allThemes){
     if(!BUILTIN_THEMES[name]) custom[name] = allThemes[name];
   });
   localStorage.setItem(LS_THEMES, JSON.stringify(custom));
+}
+
+function activeLayer(){
+  ensureLayersIntegrity();
+  return state.layers.find(l => l.id === state.activeLayerId) || state.layers[0];
+}
+
+function setActiveLayer(id, skipHistory = false){
+  if(!id || state.activeLayerId === id) return;
+  if(!state.layers.some(l => l.id === id)) return;
+  state.activeLayerId = id;
+  saveState();
+  syncUIFromState();
+  renderAll();
+  if(!skipHistory) pushHistory();
+}
+
+function getLayerById(id){
+  return state.layers.find(l => l.id === id);
+}
+
+function addLayer(copyFrom){
+  const base = copyFrom ? deepClone(copyFrom) : makeLayer();
+  base.id = `layer-${Math.random().toString(36).slice(2,7)}`;
+  if(base.pos){
+    base.pos.x += 24;
+    base.pos.y += 24;
+  }
+  state.layers.push(makeLayer(base));
+  state.activeLayerId = base.id;
+  saveState();
+  syncUIFromState();
+  renderAll();
+  pushHistory();
+}
+
+function removeActiveLayer(){
+  if(state.layers.length <= 1){
+    alert("Нужно оставить хотя бы одно окно.");
+    return;
+  }
+  const currentId = state.activeLayerId;
+  state.layers = state.layers.filter(l => l.id !== currentId);
+  ensureLayersIntegrity();
+  saveState();
+  syncUIFromState();
+  renderAll();
+  pushHistory();
 }
 
 function loadPresets(){
@@ -971,7 +1078,8 @@ function applyThemeByName(name){
   const t = themes[name] || themes["Parchment Dusk"];
   if(!t) return;
   setCssVars(t.vars || {});
-  state.theme = name;
+  const layer = activeLayer();
+  layer.theme = name;
   saveState();
 }
 
@@ -985,38 +1093,47 @@ function setCanvas(sizeStr){
   const [w,h] = sizeStr.split("x").map(Number);
   state.canvas = sizeStr;
 
-  const viewW = 960;
+  const zoom = state.canvasZoom || 1;
+  const viewW = Math.round(960 * zoom);
   const scale = viewW / w;
   const viewH = Math.round(h * scale);
   ui.artboard.style.width = viewW + "px";
   ui.artboard.style.height = viewH + "px";
+  ui.artboard.style.minHeight = viewH + "px";
+  ui.artboard.scrollTop = 0;
+  ui.artboard.scrollLeft = 0;
   ui.artboard.dataset.scale = String(scale);
 
-  applyWindowRectFromState();
+  state.layers.forEach(layer => {
+    const el = layerNodes.get(layer.id);
+    if(el) applyWindowRectFromState(layer, el);
+  });
   updateLayoutStats();
   saveState();
 }
 
 function scale(){ return parseFloat(ui.artboard.dataset.scale || "0.5"); }
 
-function applyWindowRectFromState(){
+function applyWindowRectFromState(layer, el){
+  if(!layer || !el) return;
   const s = scale();
-  ui.sysWindow.style.left = (state.pos.x * s) + "px";
-  ui.sysWindow.style.top  = (state.pos.y * s) + "px";
-  ui.sysWindow.style.width= (state.pos.w * s) + "px";
-  ui.sysWindow.style.height = (state.pos.h && state.pos.h > 0) ? (state.pos.h * s) + "px" : "auto";
+  el.style.left = (layer.pos.x * s) + "px";
+  el.style.top  = (layer.pos.y * s) + "px";
+  el.style.width= (layer.pos.w * s) + "px";
+  el.style.height = (layer.pos.h && layer.pos.h > 0) ? (layer.pos.h * s) + "px" : "auto";
   updateLayoutStats();
 }
 
-function captureWindowRectToState(){
+function captureWindowRectToState(layer, el){
+  if(!layer || !el) return;
   const s = scale();
-  const r = ui.sysWindow.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
   const a = ui.artboard.getBoundingClientRect();
-  const x = (r.left - a.left) / s;
-  const y = (r.top - a.top) / s;
+  const x = (r.left - a.left + ui.artboard.scrollLeft) / s;
+  const y = (r.top - a.top + ui.artboard.scrollTop) / s;
   const w = r.width / s;
-  const h = ui.sysWindow.style.height && ui.sysWindow.style.height !== "auto" ? (r.height / s) : 0;
-  state.pos = {x,y,w,h};
+  const h = el.style.height && el.style.height !== "auto" ? (r.height / s) : 0;
+  layer.pos = {x,y,w,h};
   saveState();
   updateLayoutStats();
 }
@@ -1024,97 +1141,121 @@ function captureWindowRectToState(){
 function snap8(v){ return Math.round(v / 8) * 8; }
 
 // Drag
-let drag = {on:false, dx:0, dy:0, pointerId:null};
-function bindDrag(){
-  const handle = ui.sysWindow.querySelector(".w-head.draggable") || ui.sysWindow;
+let drag = {on:false, dx:0, dy:0, pointerId:null, layerId:null, el:null};
+function bindDrag(el, layerId){
+  const handle = el.querySelector(".w-head.draggable") || el;
   handle.onpointerdown = (e) => {
     e.preventDefault();
     drag.on = true;
     drag.pointerId = e.pointerId;
-    const r = ui.sysWindow.getBoundingClientRect();
+    drag.layerId = layerId;
+    drag.el = el;
+    setActiveLayer(layerId, true);
+    const r = el.getBoundingClientRect();
     drag.dx = e.clientX - r.left;
     drag.dy = e.clientY - r.top;
     handle.setPointerCapture(e.pointerId);
   };
   handle.onpointermove = (e) => {
-    if(!drag.on) return;
+    if(!drag.on || !drag.el) return;
     const a = ui.artboard.getBoundingClientRect();
-    let x = e.clientX - a.left - drag.dx;
-    let y = e.clientY - a.top - drag.dy;
+    const scrollX = ui.artboard.scrollLeft;
+    const scrollY = ui.artboard.scrollTop;
+    let x = e.clientX - a.left - drag.dx + scrollX;
+    let y = e.clientY - a.top - drag.dy + scrollY;
 
     if(state.snap){
       x = snap8(x);
       y = snap8(y);
     }
-    x = Math.max(0, Math.min(x, a.width - 40));
-    y = Math.max(0, Math.min(y, a.height - 40));
+    x = Math.max(0, Math.min(x, a.width + scrollX - 40));
+    y = Math.max(0, Math.min(y, a.height + scrollY - 40));
 
-    ui.sysWindow.style.left = x + "px";
-    ui.sysWindow.style.top  = y + "px";
+    drag.el.style.left = x + "px";
+    drag.el.style.top  = y + "px";
   };
   handle.onpointerup = () => {
-    if(!drag.on) return;
+    if(!drag.on || !drag.el) return;
     drag.on = false;
-    captureWindowRectToState();
+    const layer = getLayerById(layerId);
+    captureWindowRectToState(layer, drag.el);
     pushHistory();
+    drag.el = null;
   };
 
   handle.ondblclick = () => {
-    // center X
     const a = ui.artboard.getBoundingClientRect();
-    const w = ui.sysWindow.getBoundingClientRect().width;
-    ui.sysWindow.style.left = Math.max(0, (a.width - w) / 2) + "px";
-    captureWindowRectToState();
+    const w = el.getBoundingClientRect().width;
+    el.style.left = Math.max(0, (a.width - w) / 2) + "px";
+    const layer = getLayerById(layerId);
+    captureWindowRectToState(layer, el);
     pushHistory();
   };
 
-  ui.sysWindow.onmouseup = () => captureWindowRectToState();
+  el.onmouseup = () => {
+    const layer = getLayerById(layerId);
+    captureWindowRectToState(layer, el);
+  };
 }
 
 function centerWindowOnCanvas(){
+  const layer = activeLayer();
+  const el = layerNodes.get(layer.id);
+  if(!el) return;
   const a = ui.artboard.getBoundingClientRect();
-  const w = ui.sysWindow.getBoundingClientRect().width;
-  const h = ui.sysWindow.getBoundingClientRect().height;
-  ui.sysWindow.style.left = Math.max(0, (a.width - w) / 2) + "px";
-  ui.sysWindow.style.top = Math.max(0, (a.height - h) / 2) + "px";
-  captureWindowRectToState();
+  const w = el.getBoundingClientRect().width;
+  const h = el.getBoundingClientRect().height;
+  el.style.left = Math.max(0, (a.width - w) / 2) + "px";
+  el.style.top = Math.max(0, (a.height - h) / 2) + "px";
+  captureWindowRectToState(layer, el);
   pushHistory();
 }
 
 function autoHeightWindow(){
-  ui.sysWindow.style.height = "auto";
-  state.pos.h = 0;
-  captureWindowRectToState();
+  const layer = activeLayer();
+  const el = layerNodes.get(layer.id);
+  if(!el) return;
+  el.style.height = "auto";
+  layer.pos.h = 0;
+  captureWindowRectToState(layer, el);
   pushHistory();
 }
 
 function setWindowWidthRatio(ratio){
+  const layer = activeLayer();
+  const el = layerNodes.get(layer.id);
+  if(!el) return;
   const a = ui.artboard.getBoundingClientRect();
   const newW = Math.max(360, a.width * ratio);
-  ui.sysWindow.style.width = newW + "px";
-  ui.sysWindow.style.height = "auto";
-  captureWindowRectToState();
+  el.style.width = newW + "px";
+  el.style.height = "auto";
+  captureWindowRectToState(layer, el);
   pushHistory();
 }
 
-function setFxClasses(){
-  ui.sysWindow.classList.remove("fx-lag","fx-glitch","fx-scanlines");
-  if(state.fxMode === "lag") ui.sysWindow.classList.add("fx-lag");
-  if(state.fxMode === "glitch") ui.sysWindow.classList.add("fx-glitch");
-  if(state.fxMode === "scanlines") ui.sysWindow.classList.add("fx-scanlines");
-  document.documentElement.style.setProperty("--fx-i", String(state.fxIntensity));
+function setFxClasses(layer, el){
+  if(!el || !layer) return;
+  el.classList.remove("fx-lag","fx-glitch","fx-scanlines");
+  if(layer.fxMode === "lag") el.classList.add("fx-lag");
+  if(layer.fxMode === "glitch") el.classList.add("fx-glitch");
+  if(layer.fxMode === "scanlines") el.classList.add("fx-scanlines");
+  if(layer.id === state.activeLayerId){
+    document.documentElement.style.setProperty("--fx-i", String(layer.fxIntensity));
+  }
 }
 
-function setTypeSizeClass(){
-  ui.sysWindow.classList.remove("type-toast","type-global","type-logs");
-  if(state.type === "system_toast") ui.sysWindow.classList.add("type-toast");
-  if(state.type === "global_banner") ui.sysWindow.classList.add("type-global");
-  if(state.type === "log_panel") ui.sysWindow.classList.add("type-logs");
+function setTypeSizeClass(layer, el){
+  if(!el || !layer) return;
+  el.classList.remove("type-toast","type-global","type-logs");
+  if(layer.type === "system_toast") el.classList.add("type-toast");
+  if(layer.type === "global_banner") el.classList.add("type-global");
+  if(layer.type === "log_panel") el.classList.add("type-logs");
 }
 
 function renderTypeMeta(){
-  const meta = TYPE_META[state.type] || {};
-  ui.typeTitle.textContent = meta.title || (WINDOW_TYPES[state.type]?.label || "Тип окна");
+  const layer = activeLayer();
+  const meta = TYPE_META[layer.type] || {};
+  ui.typeTitle.textContent = meta.title || (WINDOW_TYPES[layer.type]?.label || "Тип окна");
   ui.typeDesc.textContent = meta.desc || "Настрой поля и сохрани пресет.";
   ui.typeChips.innerHTML = "";
   (meta.chips || []).forEach(c => {
@@ -1126,23 +1267,29 @@ function renderTypeMeta(){
 }
 
 function updateMetaBar(){
-  const typeLabel = WINDOW_TYPES[state.type]?.label || state.type;
+  const layer = activeLayer();
+  const typeLabel = WINDOW_TYPES[layer.type]?.label || layer.type;
   const [cw,ch] = String(state.canvas || "1920x1080").split("x").map(Number);
-  const winW = state.pos.w || Math.round(ui.sysWindow.getBoundingClientRect().width / scale());
-  const winH = state.pos.h ? state.pos.h : Math.round(ui.sysWindow.getBoundingClientRect().height / scale());
+  const el = layerNodes.get(layer.id);
+  const rect = el?.getBoundingClientRect();
+  const winWRaw = layer.pos.w || Math.round((rect?.width || layer.pos.w || 0) / scale());
+  const winHRaw = layer.pos.h ? layer.pos.h : Math.round((rect?.height || layer.pos.h || 0) / scale());
+  const winW = Number.isFinite(winWRaw) ? winWRaw : 0;
+  const winH = Number.isFinite(winHRaw) ? winHRaw : 0;
 
   ui.metaType.textContent = typeLabel;
-  ui.metaTheme.textContent = `Тема: ${state.theme}`;
-  ui.metaCanvas.textContent = `Холст: ${cw}×${ch}`;
-  const pages = parseInt(ui.sysWindow.dataset.pages || "1", 10);
-  const pageInfo = pages > 1 ? `страницы ${state.pageIndex+1}/${pages}` : "1 страница";
-  ui.metaWindow.textContent = `Окно: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"} • X ${Math.round(state.pos.x)}, Y ${Math.round(state.pos.y)} • ${pageInfo}`;
+  ui.metaTheme.textContent = `Тема: ${layer.theme}`;
+  const zoomPct = Math.round((state.canvasZoom || 1) * 100);
+  ui.metaCanvas.textContent = `Холст: ${cw}×${ch} @${zoomPct}%`;
+  const pages = parseInt(el?.dataset.pages || "1", 10);
+  const pageInfo = pages > 1 ? `страницы ${layer.pageIndex+1}/${pages}` : "1 страница";
+  ui.metaWindow.textContent = `Окно: ${Math.round(winW)}px × ${layer.pos.h ? Math.round(winH)+"px" : "auto"} • X ${Math.round(layer.pos.x)}, Y ${Math.round(layer.pos.y)} • ${pageInfo}`;
 
   ui.layoutStats.textContent = [
-    `pos: ${Math.round(state.pos.x)}×${Math.round(state.pos.y)}px`,
-    `size: ${Math.round(winW)}px × ${state.pos.h ? Math.round(winH)+"px" : "auto"}`,
+    `pos: ${Math.round(layer.pos.x)}×${Math.round(layer.pos.y)}px`,
+    `size: ${Math.round(winW)}px × ${layer.pos.h ? Math.round(winH)+"px" : "auto"}`,
     state.snap ? "snap: on" : "snap: off",
-    pages > 1 ? `pages: ${state.pageIndex+1}/${pages}` : "pages: 1"
+    pages > 1 ? `pages: ${layer.pageIndex+1}/${pages}` : "pages: 1"
   ].join(" • ");
 }
 
@@ -1169,17 +1316,18 @@ function applyQuickStart(preset){
   const def = WINDOW_TYPES[preset.type];
   if(!def) return;
 
-  if(!state.dataByType[preset.type]) state.dataByType[preset.type] = deepClone(def.defaults);
-  state.type = preset.type;
-  state.theme = preset.theme || state.theme;
-  state.fxMode = preset.fxMode ?? "none";
-  state.fxIntensity = preset.fxIntensity ?? state.fxIntensity;
+  const layer = activeLayer();
+  if(!layer.dataByType[preset.type]) layer.dataByType[preset.type] = deepClone(def.defaults);
+  layer.type = preset.type;
+  layer.theme = preset.theme || layer.theme;
+  layer.fxMode = preset.fxMode ?? "none";
+  layer.fxIntensity = preset.fxIntensity ?? layer.fxIntensity;
   state.canvas = preset.canvas || state.canvas;
-  state.corruptAmount = preset.corruptAmount ?? state.corruptAmount;
-  state.pageIndex = 0;
+  layer.corruptAmount = preset.corruptAmount ?? layer.corruptAmount;
+  layer.pageIndex = 0;
 
-  state.dataByType[preset.type] = {...deepClone(def.defaults), ...(preset.data || {})};
-  if(preset.pos) state.pos = deepClone(preset.pos);
+  layer.dataByType[preset.type] = {...deepClone(def.defaults), ...(preset.data || {})};
+  if(preset.pos) layer.pos = deepClone(preset.pos);
 
   saveState();
   syncUIFromState();
@@ -1191,10 +1339,10 @@ function updateLayoutStats(){
   updateMetaBar();
 }
 
-function setupPaging(){
-  const viewport = ui.sysWindow.querySelector(".page-viewport");
-  const track = ui.sysWindow.querySelector(".page-track");
-  const nav = ui.sysWindow.querySelector(".page-nav");
+function setupPaging(el, layer){
+  const viewport = el.querySelector(".page-viewport");
+  const track = el.querySelector(".page-track");
+  const nav = el.querySelector(".page-nav");
   if(!viewport || !track || !nav) return 1;
 
   const maxAllowed = Math.max(320, ui.artboard.clientHeight - 60);
@@ -1203,32 +1351,32 @@ function setupPaging(){
 
   const pageHeight = viewport.clientHeight || targetH;
   const pages = Math.max(1, Math.ceil(track.scrollHeight / pageHeight));
-  ui.sysWindow.dataset.pages = String(pages);
-  ui.sysWindow.dataset.pageHeight = String(pageHeight);
-  if(state.pageIndex >= pages) state.pageIndex = pages - 1;
+  el.dataset.pages = String(pages);
+  el.dataset.pageHeight = String(pageHeight);
+  if(layer.pageIndex >= pages) layer.pageIndex = pages - 1;
 
   function applyPage(idx){
-    state.pageIndex = Math.max(0, Math.min(idx, pages - 1));
-    track.style.transform = `translateY(-${pageHeight * state.pageIndex}px)`;
+    layer.pageIndex = Math.max(0, Math.min(idx, pages - 1));
+    track.style.transform = `translateY(-${pageHeight * layer.pageIndex}px)`;
     const dots = nav.querySelector(".page-dots");
     dots.innerHTML = "";
     for(let i=0;i<pages;i++){
       const d = document.createElement("div");
-      d.className = "page-dot" + (i === state.pageIndex ? " active" : "");
+      d.className = "page-dot" + (i === layer.pageIndex ? " active" : "");
       d.addEventListener("click", () => applyPage(i));
       dots.appendChild(d);
     }
     const label = nav.querySelector(".page-label");
-    label.textContent = pages > 1 ? `Страница ${state.pageIndex+1}/${pages}` : "";
+    label.textContent = pages > 1 ? `Страница ${layer.pageIndex+1}/${pages}` : "";
     nav.hidden = pages <= 1;
     saveState();
   }
 
   nav.querySelectorAll(".page-btn").forEach(btn => {
-    btn.onclick = () => applyPage(state.pageIndex + Number(btn.dataset.dir || "0"));
+    btn.onclick = () => applyPage(layer.pageIndex + Number(btn.dataset.dir || "0"));
   });
 
-  applyPage(state.pageIndex);
+  applyPage(layer.pageIndex);
   return pages;
 }
 
@@ -1241,6 +1389,19 @@ function buildTypeSelect(){
     opt.textContent = def.label;
     ui.type.appendChild(opt);
   });
+}
+
+function rebuildLayerSelect(){
+  if(!ui.layerSelect) return;
+  ui.layerSelect.innerHTML = "";
+  state.layers.forEach((layer, idx) => {
+    const opt = document.createElement("option");
+    const label = WINDOW_TYPES[layer.type]?.label || layer.type;
+    opt.value = layer.id;
+    opt.textContent = `${idx+1}) ${label}`;
+    ui.layerSelect.appendChild(opt);
+  });
+  ui.layerSelect.value = state.activeLayerId;
 }
 
 function buildThemeSelect(){
@@ -1329,11 +1490,12 @@ function renderCustomBlocks(){
 }
 
 function buildFields(){
-  const def = WINDOW_TYPES[state.type];
+  const layer = activeLayer();
+  const def = WINDOW_TYPES[layer.type];
   if(!def) return;
 
-  if(!state.dataByType[state.type]){
-    state.dataByType[state.type] = deepClone(def.defaults);
+  if(!layer.dataByType[layer.type]){
+    layer.dataByType[layer.type] = deepClone(def.defaults);
   }
 
   ui.fields.innerHTML = "";
@@ -1348,19 +1510,19 @@ function buildFields(){
     let input;
     if(f.type === "textarea"){
       input = document.createElement("textarea");
-      input.value = state.dataByType[state.type][f.id] ?? "";
+      input.value = layer.dataByType[layer.type][f.id] ?? "";
       input.spellcheck = false;
     }else{
       input = document.createElement("input");
       input.type = "text";
-      input.value = state.dataByType[state.type][f.id] ?? "";
+      input.value = layer.dataByType[layer.type][f.id] ?? "";
     }
     input.dataset.fieldId = f.id;
 
     input.addEventListener("input", () => {
-      state.dataByType[state.type][f.id] = input.value;
+      layer.dataByType[layer.type][f.id] = input.value;
       saveState();
-      renderWindow();
+      renderLayers();
       // history (debounced)
       debouncedHistory();
     });
@@ -1416,16 +1578,35 @@ function wrapSelection(prefix, suffix){
   lastTextInput = target;
 }
 
-function renderWindow(){
-  const def = WINDOW_TYPES[state.type];
+function getOrCreateLayerEl(layer){
+  let el = layerNodes.get(layer.id);
+  if(el) return el;
+  if(layerNodes.size === 0 && ui.sysWindow){
+    ui.sysWindow.dataset.layerId = layer.id;
+    layerNodes.set(layer.id, ui.sysWindow);
+    return ui.sysWindow;
+  }
+  el = document.createElement("div");
+  el.className = "sys-window";
+  el.dataset.layerId = layer.id;
+  el.addEventListener("pointerdown", () => setActiveLayer(layer.id, true));
+  ui.artboard.appendChild(el);
+  layerNodes.set(layer.id, el);
+  return el;
+}
+
+function renderLayer(layer){
+  const def = WINDOW_TYPES[layer.type];
   if(!def) return;
 
-  setTypeSizeClass();
-  setFxClasses();
+  const el = getOrCreateLayerEl(layer);
+  el.dataset.pages = "1";
+  el.dataset.pageIndex = String(layer.pageIndex || 0);
+  el.classList.toggle("active", layer.id === state.activeLayerId);
 
-  const data = state.dataByType[state.type] || def.defaults;
+  const data = layer.dataByType[layer.type] || def.defaults;
   const inner = def.render(data);
-  ui.sysWindow.innerHTML = `
+  el.innerHTML = `
     <div class="page-viewport">
       <div class="page-track">${inner}</div>
     </div>
@@ -1437,22 +1618,20 @@ function renderWindow(){
     </div>
   `;
 
-  // re-apply rect after re-render
-  applyWindowRectFromState();
+  setTypeSizeClass(layer, el);
+  setFxClasses(layer, el);
 
-  // corruption (only inside .fx-text blocks)
-  const amt = state.corruptAmount;
+  const amt = layer.corruptAmount;
   if(amt > 0){
-    const seed = state.corruptSeed;
-    const blocks = ui.sysWindow.querySelectorAll(".fx-text");
+    const seed = layer.corruptSeed;
+    const blocks = el.querySelectorAll(".fx-text");
     let i = 0;
     blocks.forEach(b => applyCorruptionTo(b, amt, seed + i++ * 10007));
   }
 
-  setupPaging();
-
-  // ensure title has data-text for glitch overlay (already set in templates)
-  bindDrag();
+  setupPaging(el, layer);
+  bindDrag(el, layer.id);
+  applyWindowRectFromState(layer, el);
   updateLayoutStats();
 }
 
@@ -1461,36 +1640,54 @@ function renderGrid(){
 }
 
 function renderAll(){
-  applyThemeByName(state.theme);
+  const layer = activeLayer();
+  applyThemeByName(layer.theme);
   applyCustomCss();
   setCanvas(state.canvas);
   renderGrid();
   buildFields();
   refreshPresets();
-  renderWindow();
+  rebuildLayerSelect();
+  renderLayers();
   renderTypeMeta();
   updateLayoutStats();
   syncFxLabels();
 }
 
+function renderLayers(){
+  const alive = new Set(state.layers.map(l => l.id));
+  // cleanup removed nodes
+  Array.from(layerNodes.entries()).forEach(([id, el]) => {
+    if(!alive.has(id)){
+      el.remove();
+      layerNodes.delete(id);
+    }
+  });
+  state.layers.forEach(layer => renderLayer(layer));
+}
+
 function syncFxLabels(){
-  ui.fxIntVal.textContent = `${Math.round(state.fxIntensity * 100)}%`;
-  ui.corruptVal.textContent = `${Math.round(state.corruptAmount * 100)}%`;
+  const layer = activeLayer();
+  ui.fxIntVal.textContent = `${Math.round(layer.fxIntensity * 100)}%`;
+  ui.corruptVal.textContent = `${Math.round(layer.corruptAmount * 100)}%`;
 }
 
 function syncUIFromState(){
-  ui.type.value = state.type;
-  ui.theme.value = state.theme;
+  const layer = activeLayer();
+  ui.type.value = layer.type;
+  ui.theme.value = layer.theme;
   ui.canvas.value = state.canvas;
+  if(ui.canvasZoom) ui.canvasZoom.value = String(state.canvasZoom || 1);
   ui.exportTarget.value = state.exportTarget;
   ui.exportScale.value = String(state.exportScale);
 
-  ui.fxMode.value = state.fxMode;
-  ui.fxIntensity.value = String(Math.round(state.fxIntensity * 100));
-  ui.corrupt.value = String(Math.round(state.corruptAmount * 100));
+  ui.fxMode.value = layer.fxMode;
+  ui.fxIntensity.value = String(Math.round(layer.fxIntensity * 100));
+  ui.corrupt.value = String(Math.round(layer.corruptAmount * 100));
   ui.snap.checked = state.snap;
   ui.grid.checked = state.showGrid;
   ui.freezeFx.checked = state.freezeFxOnExport;
+  ui.freezeSeed.textContent = layer.seedFrozen ? "Фиксировать сид" : "Сид: свободный";
 
   syncFxLabels();
 }
@@ -1505,6 +1702,7 @@ function refreshPresets(){
     b.title = "Загрузить";
     b.addEventListener("click", () => {
       state = deepClone(p.state);
+      ensureLayersIntegrity();
       saveState();
       syncUIFromState();
       renderAll();
@@ -1527,7 +1725,8 @@ function refreshPresets(){
 function openThemeEditor(){
   ui.themeEditor.style.display = "block";
   const themes = loadThemes();
-  const t = themes[state.theme] || themes["Parchment Dusk"];
+  const layer = activeLayer();
+  const t = themes[layer.theme] || themes["Parchment Dusk"];
   const vars = t.vars || {};
 
   ui.tName.value = "";
@@ -1575,7 +1774,7 @@ function liveApplyThemeFromEditor(){
     "--glow-alpha": String((parseInt(ui.tGlow.value,10) / 100).toFixed(2))
   });
   ui.customCssSlot.textContent = ui.tCustomCss.value || "";
-  renderWindow();
+  renderLayers();
 }
 
 [ui.tPanelBg, ui.tInk, ui.tBorder, ui.tAccent, ui.tAccent2, ui.tPageBg,
@@ -1590,12 +1789,14 @@ ui.tSave.addEventListener("click", () => {
   if(!name){ alert("Укажи имя темы."); return; }
 
   const themes = loadThemes();
+  const layer = activeLayer();
+  const baseVars = themes[layer.theme]?.vars || {};
   themes[name] = {
     vars: {
       "--page-bg": ui.tPageBg.value,
       "--panel-bg": hexToRgba(ui.tPanelBg.value, 0.93),
       "--panel-ink": ui.tInk.value,
-      "--panel-muted": themes[state.theme]?.vars?.["--panel-muted"] || "rgba(27, 20, 10, 0.70)",
+      "--panel-muted": baseVars["--panel-muted"] || "rgba(27, 20, 10, 0.70)",
       "--border": hexToRgba(ui.tBorder.value, 0.55),
       "--border-w": `${ui.tBorderW.value}px`,
       "--accent": ui.tAccent.value,
@@ -1641,6 +1842,7 @@ ui.applyJson.addEventListener("click", () => {
     const obj = JSON.parse(txt);
     if(!obj || typeof obj !== "object") throw new Error("bad json");
     state = {...deepClone(DEFAULT_STATE), ...obj};
+    ensureLayersIntegrity();
     saveState();
     syncUIFromState();
     renderAll();
@@ -1708,8 +1910,10 @@ ui.addBlock.addEventListener("click", () => {
 
 // Presets
 ui.savePreset.addEventListener("click", () => {
-  captureWindowRectToState();
-  const name = prompt("Имя пресета:", `${state.type} / ${state.theme}`);
+  const layer = activeLayer();
+  const el = layerNodes.get(layer.id);
+  if(el) captureWindowRectToState(layer, el);
+  const name = prompt("Имя пресета:", `${layer.type} / ${layer.theme}`);
   if(!name) return;
 
   const list = loadPresets();
@@ -1727,6 +1931,7 @@ ui.reset.addEventListener("click", () => {
   if(!confirm("Сбросить проект?")) return;
   localStorage.removeItem(LS_STATE);
   state = deepClone(DEFAULT_STATE);
+  ensureLayersIntegrity();
   // keep themes/presets unless user explicitly deletes them
   saveState();
   syncUIFromState();
@@ -1738,10 +1943,11 @@ ui.reset.addEventListener("click", () => {
 
 // Controls wiring
 ui.type.addEventListener("change", () => {
-  state.type = ui.type.value;
-  state.pageIndex = 0;
+  const layer = activeLayer();
+  layer.type = ui.type.value;
+  layer.pageIndex = 0;
   buildFields();
-  renderWindow();
+  renderLayers();
   renderTypeMeta();
   updateLayoutStats();
   saveState();
@@ -1751,18 +1957,29 @@ ui.type.addEventListener("change", () => {
 ui.theme.addEventListener("change", () => {
   applyThemeByName(ui.theme.value);
   buildThemeSelect();
-  ui.theme.value = state.theme;
+  ui.theme.value = activeLayer().theme;
   renderAll();
   pushHistory();
 });
 
 ui.canvas.addEventListener("change", () => {
   setCanvas(ui.canvas.value);
-  renderWindow();
+  renderLayers();
   renderTypeMeta();
   updateLayoutStats();
   pushHistory();
 });
+
+if(ui.canvasZoom){
+  ui.canvasZoom.addEventListener("change", () => {
+    state.canvasZoom = parseFloat(ui.canvasZoom.value || "1") || 1;
+    setCanvas(state.canvas);
+    renderLayers();
+    updateLayoutStats();
+    saveState();
+    pushHistory();
+  });
+}
 
 ui.exportTarget.addEventListener("change", () => {
   state.exportTarget = ui.exportTarget.value;
@@ -1774,41 +1991,43 @@ ui.exportScale.addEventListener("change", () => {
 });
 
 ui.fxMode.addEventListener("change", () => {
-  state.fxMode = ui.fxMode.value;
-  renderWindow();
+  const layer = activeLayer();
+  layer.fxMode = ui.fxMode.value;
+  renderLayers();
   saveState();
   pushHistory();
 });
 
 ui.fxIntensity.addEventListener("input", () => {
   const v = parseInt(ui.fxIntensity.value, 10);
-  state.fxIntensity = Math.max(0, Math.min(2, v / 100));
+  const layer = activeLayer();
+  layer.fxIntensity = Math.max(0, Math.min(2, v / 100));
   syncFxLabels();
-  renderWindow();
+  renderLayers();
   saveState();
 });
 
 ui.corrupt.addEventListener("input", () => {
   const v = parseInt(ui.corrupt.value, 10);
-  state.corruptAmount = Math.max(0, Math.min(0.40, v / 100));
+  const layer = activeLayer();
+  layer.corruptAmount = Math.max(0, Math.min(0.40, v / 100));
   syncFxLabels();
-  renderWindow();
+  renderLayers();
   saveState();
 });
 
 ui.newSeed.addEventListener("click", () => {
-  state.corruptSeed = (Date.now() >>> 0);
-  if(!state.seedFrozen){
-    // if not frozen, also update on each click; (this is the click)
-  }
+  const layer = activeLayer();
+  layer.corruptSeed = (Date.now() >>> 0);
   saveState();
-  renderWindow();
+  renderLayers();
   pushHistory();
 });
 
 ui.freezeSeed.addEventListener("click", () => {
-  state.seedFrozen = !state.seedFrozen;
-  ui.freezeSeed.textContent = state.seedFrozen ? "Фиксировать сид" : "Сид: свободный";
+  const layer = activeLayer();
+  layer.seedFrozen = !layer.seedFrozen;
+  ui.freezeSeed.textContent = layer.seedFrozen ? "Фиксировать сид" : "Сид: свободный";
   saveState();
 });
 
@@ -1826,6 +2045,15 @@ ui.freezeFx.addEventListener("change", () => {
   state.freezeFxOnExport = ui.freezeFx.checked;
   saveState();
 });
+
+if(ui.layerSelect){
+  ui.layerSelect.addEventListener("change", () => {
+    setActiveLayer(ui.layerSelect.value);
+  });
+}
+ui.addLayer?.addEventListener("click", () => addLayer());
+ui.cloneLayer?.addEventListener("click", () => addLayer(activeLayer()));
+ui.removeLayer?.addEventListener("click", () => removeActiveLayer());
 
 ui.centerWindow.addEventListener("click", centerWindowOnCanvas);
 ui.fitWindow.addEventListener("click", autoHeightWindow);
@@ -1863,7 +2091,12 @@ ui.exportBtn.addEventListener("click", async () => {
     return;
   }
 
-  const target = (ui.exportTarget.value === "canvas") ? ui.artboard : ui.sysWindow;
+  const activeEl = layerNodes.get(activeLayer().id) || ui.sysWindow;
+  const target = (ui.exportTarget.value === "canvas") ? ui.artboard : activeEl;
+  if(!target){
+    alert("Нет активного окна для экспорта.");
+    return;
+  }
   const scaleFactor = parseFloat(ui.exportScale.value || "2");
 
   // freeze animations if desired
@@ -1882,7 +2115,7 @@ ui.exportBtn.addEventListener("click", async () => {
     const url = canvas.toDataURL("image/png");
     const a = document.createElement("a");
     const ts = new Date().toISOString().replaceAll(":","-").slice(0,19);
-    a.download = `system_${state.type}_${ts}.png`;
+    a.download = `system_${activeLayer().type}_${ts}.png`;
     a.href = url;
     a.click();
   }catch(err){
@@ -1896,11 +2129,7 @@ ui.exportBtn.addEventListener("click", async () => {
 // Init
 function init(){
   loadState();
-
-  // ensure defaults for all types
-  for(const [id, def] of Object.entries(WINDOW_TYPES)){
-    if(!state.dataByType[id]) state.dataByType[id] = deepClone(def.defaults);
-  }
+  ensureLayersIntegrity();
 
   buildTypeSelect();
   buildThemeSelect();
@@ -1910,20 +2139,19 @@ function init(){
 
   // Apply state
   syncUIFromState();
-  applyThemeByName(state.theme);
+  applyThemeByName(activeLayer().theme);
   applyCustomCss();
   setCanvas(state.canvas);
   renderGrid();
   buildFields();
   refreshPresets();
-  renderWindow();
+  rebuildLayerSelect();
+  renderLayers();
 
   // initial history snapshot
   history = [];
   historyIdx = -1;
   pushHistory();
-
-  bindDrag();
 }
 
 init();

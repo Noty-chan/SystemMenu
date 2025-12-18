@@ -318,12 +318,6 @@ input[type="range"]{
   display:flex;
   flex-direction:column;
   gap: 10px;
-  position:sticky;
-  top: 12px;
-  align-self:start;
-}
-@media (max-width: 1100px){
-  .stage{ position: static; }
 }
 .stage-top .note{
   font-size: 12px;
@@ -331,11 +325,16 @@ input[type="range"]{
 }
 
 .art-wrap{
+  position:sticky;
+  top: 12px;
   background: rgba(0,0,0,.18);
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 16px;
   padding: 12px;
   box-shadow: 0 20px 70px rgba(0,0,0,.20);
+}
+@media (max-width: 1100px){
+  .art-wrap{ position: static; }
 }
 .artboard{
   position:relative;
@@ -403,13 +402,13 @@ input[type="range"]{
   margin-top: 3px;
   font-family: var(--mono-font);
   font-size: 12px;
-  color: color-mix(in srgb, var(--panel-muted) 78%, #ffffff 22%);
+  color: color-mix(in srgb, var(--panel-muted) 70%, #ffffff 30%);
 }
 .w-body{
   padding: 14px 16px 16px;
   font-size: 13px;
   line-height: 1.4;
-  color: color-mix(in srgb, var(--panel-ink) 78%, #fafafa 22%);
+  color: color-mix(in srgb, var(--panel-ink) 68%, #f7f7f7 32%);
 }
 
 /* UI components inside window */
@@ -448,13 +447,13 @@ input[type="range"]{
 }
 .k{
   font-size: 12px;
-  color: color-mix(in srgb, var(--panel-muted) 78%, #ffffff 22%);
+  color: color-mix(in srgb, var(--panel-muted) 68%, #ffffff 32%);
 }
 .v{
   font-family: var(--mono-font);
   font-size: 12px;
   text-align:right;
-  color: color-mix(in srgb, var(--panel-ink) 80%, #f4f7ff 20%);
+  color: color-mix(in srgb, var(--panel-ink) 66%, #f7f7f7 34%);
 }
 .list{
   margin: 8px 0 0;

@@ -321,6 +321,18 @@ const ui = {
   customCssSlot: document.getElementById("customCssSlot")
 };
 
+function isTextInput(el){
+  if(!el) return false;
+  const tag = (el.tagName || "").toLowerCase();
+  return tag === "textarea" || (tag === "input" && (el.type || "").toLowerCase() === "text");
+}
+let lastTextInput = null;
+document.addEventListener("focusin", (e) => {
+  if(isTextInput(e.target)){
+    lastTextInput = e.target;
+  }
+});
+
 // Formatting buttons
 document.getElementById("fmtBold").addEventListener("click", () => wrapSelection("**","**"));
 document.getElementById("fmtItal").addEventListener("click", () => wrapSelection("_","_"));
@@ -1247,8 +1259,18 @@ function buildMarkers(){
   for(const m of MARKERS){
     const b = document.createElement("div");
     b.className = "kbd";
+    b.tabIndex = 0;
     b.textContent = m;
-    b.addEventListener("click", () => insertToken(m));
+    b.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      insertToken(m);
+    });
+    b.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        insertToken(m);
+      }
+    });
     ui.markers.appendChild(b);
   }
 }
@@ -1260,8 +1282,18 @@ function buildBlocks(){
   for(const blk of combined){
     const b = document.createElement("div");
     b.className = "kbd";
+    b.tabIndex = 0;
     b.textContent = blk.label;
-    b.addEventListener("click", () => insertToken(blk.value));
+    b.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      insertToken(blk.value);
+    });
+    b.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        insertToken(blk.value);
+      }
+    });
     ui.blocks.appendChild(b);
   }
   renderCustomBlocks();
@@ -1273,9 +1305,19 @@ function renderCustomBlocks(){
   list.forEach((blk, idx) => {
     const b = document.createElement("div");
     b.className = "kbd";
+    b.tabIndex = 0;
     b.textContent = blk.label;
     b.title = blk.value;
-    b.addEventListener("click", () => insertToken(blk.value));
+    b.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      insertToken(blk.value);
+    });
+    b.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        insertToken(blk.value);
+      }
+    });
     b.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       const rest = loadBlocks().filter((_, j) => j !== idx);
@@ -1340,38 +1382,38 @@ function debouncedHistory(){
 // Token insertion into active element
 function insertToken(token){
   const active = document.activeElement;
-  if(!active) return;
-  const tag = active.tagName.toLowerCase();
-  if(tag !== "textarea" && tag !== "input") return;
+  const target = isTextInput(active) ? active : (isTextInput(lastTextInput) && lastTextInput.isConnected ? lastTextInput : null);
+  if(!target) return;
 
-  const start = active.selectionStart ?? active.value.length;
-  const end   = active.selectionEnd ?? active.value.length;
-  const v = active.value;
-  active.value = v.slice(0,start) + token + v.slice(end);
+  const start = target.selectionStart ?? target.value.length;
+  const end   = target.selectionEnd ?? target.value.length;
+  const v = target.value;
+  target.value = v.slice(0,start) + token + v.slice(end);
   const pos = start + token.length;
-  active.setSelectionRange(pos,pos);
-  active.dispatchEvent(new Event("input", {bubbles:true}));
-  active.focus();
+  target.setSelectionRange(pos,pos);
+  target.dispatchEvent(new Event("input", {bubbles:true}));
+  target.focus();
+  lastTextInput = target;
 }
 
 // Wrap selection
 function wrapSelection(prefix, suffix){
   const active = document.activeElement;
-  if(!active) return;
-  const tag = active.tagName.toLowerCase();
-  if(tag !== "textarea" && tag !== "input") return;
+  const target = isTextInput(active) ? active : (isTextInput(lastTextInput) && lastTextInput.isConnected ? lastTextInput : null);
+  if(!target) return;
 
-  const start = active.selectionStart ?? 0;
-  const end   = active.selectionEnd ?? 0;
+  const start = target.selectionStart ?? 0;
+  const end   = target.selectionEnd ?? 0;
   if(end <= start) return;
-  const v = active.value;
+  const v = target.value;
   const sel = v.slice(start, end);
-  active.value = v.slice(0,start) + prefix + sel + suffix + v.slice(end);
+  target.value = v.slice(0,start) + prefix + sel + suffix + v.slice(end);
   const nStart = start + prefix.length;
   const nEnd = nStart + sel.length;
-  active.setSelectionRange(nStart, nEnd);
-  active.dispatchEvent(new Event("input", {bubbles:true}));
-  active.focus();
+  target.setSelectionRange(nStart, nEnd);
+  target.dispatchEvent(new Event("input", {bubbles:true}));
+  target.focus();
+  lastTextInput = target;
 }
 
 function renderWindow(){
